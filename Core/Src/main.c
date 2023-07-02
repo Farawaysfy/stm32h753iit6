@@ -557,22 +557,22 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
     if(huart->Instance==USART3)//如果是串口3//串口3接收中断，接收来自工控屏的信息格式：从左往右共三位，第一位：状态（0：启动，1：暂停，2：终止），第二、三位为吸附轮速度，第四位为回车
     {
-        if(receive_usart1[3] == 0xd)//如果接收到的数据是回车
+        if(receive_usart3[3] == 0xd)//如果接收到的数据是回车
         {
-            if(Global_Status_set(receive_usart1[0] != '0'))
+            if(Global_Status_set(receive_usart3[0] != '0'))
             {
                 printf("Status stop/pause!");
             }
             else
-            if( receive_usart1[1]>='0' && receive_usart1[1]<='9' &&receive_usart1[2]>= '0' && receive_usart1[2]<='9')
+            if( receive_usart3[1]>='0' && receive_usart3[1]<='9' &&receive_usart3[2]>= '0' && receive_usart3[2]<='9')
             {
-                receive_usart1[3] = '\0';
-                printf("receive_usart1 = %s\r\n",receive_usart1);
-                set_speed = (receive_usart1[0]-'0')*10 + (receive_usart1[1]-'0');
+                receive_usart3[3] = '\0';
+                printf("receive_usart3 = %s\r\n",receive_usart3);
+                set_speed = (receive_usart3[0]-'0')*10 + (receive_usart3[1]-'0');
 //                reload_tim3(speed2Period(set_speed));//设置脉冲信号频率，不能在此处设置，可能定时器处于工作中期
             }
         }
-        HAL_UART_Receive_IT(&huart1, (uint8_t*)receive_usart1, USART_REC_LEN);
+        HAL_UART_Receive_IT(&huart3, (uint8_t*)receive_usart3, USART_REC_LEN);
     }
 }
 
