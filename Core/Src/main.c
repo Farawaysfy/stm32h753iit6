@@ -578,11 +578,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
         {
             if( receive_usart1[0]>='0' && receive_usart1[0]<='9' &&receive_usart1[1]>= '0' && receive_usart1[1]<='9')
             {
-                receive_usart1[2] = '\0';
+                receive_usart1[2] = '\0'; 
+                uint8_t temp = (receive_usart1[0]-'0')*10 + (receive_usart1[1]-'0');
 //                printf("receive_usart3 = %s\r\n",receive_usart3);//重定向仅作实验用
-                HAL_UART_Transmit(&huart1, (uint8_t *)"\nreceive_usart1 = ", 18, 0xFFFF);
-                HAL_UART_Transmit(&huart1, (uint8_t *)receive_usart1, 3, 0xFFFF);
-                HAL_UART_Transmit(&huart1, (uint8_t *)"\n", 1, 0xFFFF);
+                receive_seed_num=receive_seed_num|(0b1<<(temp-1));
                 led2;//与TX2连接的LED
 //                reload_tim3(speed2Period(set_speed));//设置脉冲信号频率，不能在此处设置，可能定时器处于工作中期
             }
