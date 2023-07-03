@@ -62,11 +62,11 @@ static uint8_t receive_usart3[USART_REC_LEN];
 
 static uint8_t LEDRED_Status= 0, LEDGREEN_Status = 0;
 
-//FDCAN_TxHeaderTypeDef TxHeader;
-uint8_t *TxData;
-
-//FDCAN_RxHeaderTypeDef RxHeader;
-uint8_t *RxData;
+////FDCAN_TxHeaderTypeDef TxHeader;
+//uint8_t *TxData;
+//
+////FDCAN_RxHeaderTypeDef RxHeader;
+//uint8_t *RxData;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -86,8 +86,8 @@ uint32_t speed2Period(uint32_t speed);//speed r/min
 
 void dif_fluoresent_seed(uint8_t num_Light_Gate2);
 
-uint8_t FDCAN1_Send_Msg(uint8_t * msg,uint32_t len);
-uint8_t FDCAN1_Receive_Msg(uint8_t *buf);
+//uint8_t FDCAN1_Send_Msg(uint8_t * msg,uint32_t len);
+//uint8_t FDCAN1_Receive_Msg(uint8_t *buf);
 uint8_t Global_Status_set(uint8_t command);
 /* USER CODE END PFP */
 
@@ -105,10 +105,12 @@ uint8_t Global_Status_set(uint8_t command);
 
 #define PUL_minus(n) (n ? HAL_GPIO_WritePin(GPIOB,GPIO_PIN_0,GPIO_PIN_SET): \
                 HAL_GPIO_WritePin(GPIOB,GPIO_PIN_0,GPIO_PIN_RESET)) // Pulse signal PB0（电机脉冲信号）
+#define overturn_PUL HAL_GPIO_TogglePin(GPIOB,GPIO_PIN_0) // 翻转电机脉冲信号
 //#define DIR_minus(n) (n ? HAL_GPIO_WritePin(GPIOF,GPIO_PIN_14,GPIO_PIN_SET): \
 //                HAL_GPIO_WritePin(GPIOF,GPIO_PIN_14,GPIO_PIN_RESET)) // Direction signal PF14, unuseful（正反转，弃用）
 #define ENA_minus(n) (n ? HAL_GPIO_WritePin(GPIOF,GPIO_PIN_13,GPIO_PIN_SET): \
-                HAL_GPIO_WritePin(GPIOF,GPIO_PIN_13,GPIO_PIN_RESET)) // Enable signal PF13（电机启停接口）
+                HAL_GPIO_WritePin(GPIOF,GPIO_PIN_13,GPIO_PIN_RESET)) // Enable signal PF13（电机启停接口)
+#define overturn_ENA HAL_GPIO_TogglePin(GPIOF,GPIO_PIN_13) // 翻转电机启停接口
 /* USER CODE END 0 */
 
 /**
@@ -147,8 +149,13 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
     motor_init();
-    printf("Motor control, pul_sta = %d, ena_sta = %d\r\n",pul_sta,ena_sta);
-    HAL_UART_Receive_IT(&huart3, (uint8_t *)receive_usart3, USART_REC_LEN);
+//    printf("Motor control, pul_sta = %d, ena_sta = %d\r\n",pul_sta,ena_sta);//实验
+    HAL_UART_Transmit(&huart3, (uint8_t *)"\nMotor control, pul_sta = ", 26, 0xFFFF);
+    HAL_UART_Transmit(&huart3, (uint8_t *)&pul_sta, 1, 0xFFFF);
+    HAL_UART_Transmit(&huart3, (uint8_t *)", ena_sta = ", 12, 0xFFFF);
+    HAL_UART_Transmit(&huart3, (uint8_t *)&ena_sta, 1, 0xFFFF);
+    HAL_UART_Transmit(&huart3, (uint8_t *)"\n", 1, 0xFFFF);
+//    HAL_UART_Receive_IT(&huart3, (uint8_t *)receive_usart3, USART_REC_LEN);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -159,7 +166,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
       HAL_IWDG_Refresh(&hiwdg1);
-      HAL_UART_Receive_IT(&huart3, (uint8_t *)receive_usart3, USART_REC_LEN);
+//      HAL_UART_Receive_IT(&huart3, (uint8_t *)receive_usart3, USART_REC_LEN);
   }
   /* USER CODE END 3 */
 }
@@ -492,16 +499,7 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PB3 */
-  GPIO_InitStruct.Pin = GPIO_PIN_3;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI3_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
-
   HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 
@@ -513,7 +511,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     switch (GPIO_Pin) {
         case GPIO_PIN_15: {//light gate1 detect
             if (Light_Gate1 == 0) {
-                printf("No. %d passed! \r\n",Gate1_seed_num);
+//                printf("No. %d passed! \r\n",Gate1_seed_num); //重定向仅作实验用
+                HAL_UART_Transmit(&huart3, (uint8_t *)"Gate1 Number ", 13, 0xFFFF);
+                HAL_UART_Transmit(&huart3, (uint8_t *)(&Gate1_seed_num), 1, 0xFFFF);
+                HAL_UART_Transmit(&huart3, (uint8_t *)"seed passed!\n", 13, 0xFFFF);
                 ++Gate1_seed_num;
                 if(Gate1_seed_num > 32)
                 {
@@ -523,9 +524,14 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
             break;
         }case GPIO_PIN_3: {//light gate2 detect
             if (Light_Gate2 == 0) {
-                printf("No. %d passed\r\n",Gate2_seed_num);
-                if(Gate2_seed_num > Gate1_seed_num){
-                    printf("Error, Gate2_seed_num > Gate1_seed_num\r\n");
+//                printf("No. %d passed\r\n",Gate2_seed_num); //重定向仅作实验用
+                HAL_UART_Transmit(&huart3, (uint8_t *)"\nGate2 Number ", 14, 0xFFFF);
+                HAL_UART_Transmit(&huart3, (uint8_t *)(&Gate1_seed_num), 1, 0xFFFF);
+                HAL_UART_Transmit(&huart3, (uint8_t *)"seed passed!\n", 13, 0xFFFF);
+                if((Gate2_seed_num > Gate1_seed_num) & (receive_seed_num>>Gate2_seed_num)) //判断是否为同意轮次的编号
+                {
+//                    printf("Error, Gate2_seed_num > Gate1_seed_num\r\n");//重定向仅作实验用
+                    HAL_UART_Transmit(&huart3, (uint8_t *)"Error, Gate2_seed_num > Gate1_seed_num\n", 39, 0xFFFF);
                     break;
                 }
                 dif_fluoresent_seed(Gate2_seed_num);
@@ -561,13 +567,17 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
         {
             if(Global_Status_set(receive_usart3[0] != '0'))
             {
-                printf("Status stop/pause!");
+//                printf("Status stop/pause!");//重定向仅作实验用
+                HAL_UART_Transmit(&huart3, (uint8_t *)"\nStatus stop/pause!\n", 20, 0xFFFF);
             }
             else
             if( receive_usart3[1]>='0' && receive_usart3[1]<='9' &&receive_usart3[2]>= '0' && receive_usart3[2]<='9')
             {
                 receive_usart3[3] = '\0';
-                printf("receive_usart3 = %s\r\n",receive_usart3);
+//                printf("receive_usart3 = %s\r\n",receive_usart3);//重定向仅作实验用
+                HAL_UART_Transmit(&huart3, (uint8_t *)"\nreceive_usart3 = ", 18, 0xFFFF);
+                HAL_UART_Transmit(&huart3, (uint8_t *)receive_usart3, 30, 0xFFFF);
+                HAL_UART_Transmit(&huart3, (uint8_t *)"\n", 30, 0xFFFF);
                 set_speed = (receive_usart3[0]-'0')*10 + (receive_usart3[1]-'0');
 //                reload_tim3(speed2Period(set_speed));//设置脉冲信号频率，不能在此处设置，可能定时器处于工作中期
             }
@@ -580,6 +590,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)//脉冲信号定时器中断
 {
     if(htim==(&htim1) && ena_sta == 1)//送出脉冲信号
     {
+          overturn_PUL;
 //        PUL_minus(pul_sta);
 //        pul_sta = !pul_sta;
 //        reload_tim1(speed2Period(set_speed));//周期结束重设定时器
