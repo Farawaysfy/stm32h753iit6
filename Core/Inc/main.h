@@ -60,7 +60,9 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 
 /* USER CODE BEGIN Private defines */
-#define USART_REC_LEN 4//定义最大接收字节数 4
+
+#define USART_REC_LEN_1 3//定义最大接收字节数 3
+#define USART_REC_LEN_3 4//定义最大接收字节数 4
 /* USER CODE END Private defines */
 
 #ifdef __cplusplus

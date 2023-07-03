@@ -57,8 +57,8 @@ static uint32_t delay_time = 1000000;
 
 static uint8_t Gate1_seed_num = 0, Gate2_seed_num = 0;//seed number of each gate
 static uint32_t receive_seed_num = 0b0;
-static uint8_t receive_usart1[USART_REC_LEN];
-static uint8_t receive_usart3[USART_REC_LEN];
+static uint8_t receive_usart1[USART_REC_LEN_1];
+static uint8_t receive_usart3[USART_REC_LEN_3];
 
 static uint8_t LEDRED_Status= 0, LEDGREEN_Status = 0;
 
@@ -111,6 +111,10 @@ uint8_t Global_Status_set(uint8_t command);
 #define ENA_minus(n) (n ? HAL_GPIO_WritePin(GPIOF,GPIO_PIN_13,GPIO_PIN_SET): \
                 HAL_GPIO_WritePin(GPIOF,GPIO_PIN_13,GPIO_PIN_RESET)) // Enable signal PF13（电机启停接口)
 #define overturn_ENA HAL_GPIO_TogglePin(GPIOF,GPIO_PIN_13) // 翻转电机启停接口
+
+#define led1 HAL_GPIO_TogglePin(GPIOE,GPIO_PIN_5) // LED1 PE5  通信指示灯
+#define led2 HAL_GPIO_TogglePin(GPIOE,GPIO_PIN_6) // LED2 PE6 光电门1指示灯
+#define led3 HAL_GPIO_TogglePin(GPIOB,GPIO_PIN_12) // LED3 PB12 光电门2指示灯
 /* USER CODE END 0 */
 
 /**
@@ -388,7 +392,7 @@ static void MX_USART1_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART1_Init 2 */
-    HAL_UART_Receive_IT(&huart1, (uint8_t *)receive_usart1, USART_REC_LEN);
+    HAL_UART_Receive_IT(&huart1, (uint8_t *)receive_usart1, USART_REC_LEN_1);
   /* USER CODE END USART1_Init 2 */
 
 }
@@ -437,7 +441,7 @@ static void MX_USART3_UART_Init(void)
   }
   /* USER CODE BEGIN USART3_Init 2 */
 
-    HAL_UART_Receive_IT(&huart3, (uint8_t *)receive_usart3, USART_REC_LEN);
+    HAL_UART_Receive_IT(&huart3, (uint8_t *)receive_usart3, USART_REC_LEN_3);
   /* USER CODE END USART3_Init 2 */
 
 }
@@ -534,6 +538,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
                 HAL_UART_Transmit(&huart3, (uint8_t *)"\nGate2 Number ", 14, 0xFFFF);
                 HAL_UART_Transmit(&huart3, (uint8_t *)(&Gate1_seed_num), 1, 0xFFFF);
                 HAL_UART_Transmit(&huart3, (uint8_t *)"seed passed!\n", 13, 0xFFFF);
+                led3;//光电门2指示灯
                 if((Gate2_seed_num > Gate1_seed_num) & (receive_seed_num>>Gate2_seed_num)) //判断是否为同意轮次的编号
                 {
 //                    printf("Error, Gate2_seed_num > Gate1_seed_num\r\n");//重定向仅作实验用
@@ -567,6 +572,23 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    if(huart->Instance==USART1)//如果是串口1//串口1接收中断，接收来自的信息格式：从左往右共三位，第一、二位为荧光种子编号，第三位为回车
+    {
+        if(receive_usart1[2] == 0xd)//如果接收到的数据是回车
+        {
+            if( receive_usart1[0]>='0' && receive_usart1[0]<='9' &&receive_usart1[1]>= '0' && receive_usart1[1]<='9')
+            {
+                receive_usart1[2] = '\0';
+//                printf("receive_usart3 = %s\r\n",receive_usart3);//重定向仅作实验用
+                HAL_UART_Transmit(&huart1, (uint8_t *)"\nreceive_usart1 = ", 18, 0xFFFF);
+                HAL_UART_Transmit(&huart1, (uint8_t *)receive_usart1, 3, 0xFFFF);
+                HAL_UART_Transmit(&huart1, (uint8_t *)"\n", 1, 0xFFFF);
+                led2;//与TX2连接的LED
+//                reload_tim3(speed2Period(set_speed));//设置脉冲信号频率，不能在此处设置，可能定时器处于工作中期
+            }
+        }
+        HAL_UART_Receive_IT(&huart1, (uint8_t*)receive_usart1, USART_REC_LEN_1);
+    }
     if(huart->Instance==USART3)//如果是串口3//串口3接收中断，接收来自工控屏的信息格式：从左往右共三位，第一位：状态（0：启动，1：暂停，2：终止），第二、三位为吸附轮速度，第四位为回车
     {
         if(receive_usart3[3] == 0xd)//如果接收到的数据是回车
@@ -582,13 +604,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
                 receive_usart3[3] = '\0';
 //                printf("receive_usart3 = %s\r\n",receive_usart3);//重定向仅作实验用
                 HAL_UART_Transmit(&huart3, (uint8_t *)"\nreceive_usart3 = ", 18, 0xFFFF);
-                HAL_UART_Transmit(&huart3, (uint8_t *)receive_usart3, 30, 0xFFFF);
-                HAL_UART_Transmit(&huart3, (uint8_t *)"\n", 30, 0xFFFF);
+                HAL_UART_Transmit(&huart3, (uint8_t *)receive_usart3, 4, 0xFFFF);
+                HAL_UART_Transmit(&huart3, (uint8_t *)"\n", 1, 0xFFFF);
                 set_speed = (receive_usart3[0]-'0')*10 + (receive_usart3[1]-'0');
+                led1;//与上位机通信指示灯
 //                reload_tim3(speed2Period(set_speed));//设置脉冲信号频率，不能在此处设置，可能定时器处于工作中期
             }
         }
-        HAL_UART_Receive_IT(&huart3, (uint8_t*)receive_usart3, USART_REC_LEN);
+        HAL_UART_Receive_IT(&huart3, (uint8_t*)receive_usart3, USART_REC_LEN_3);
     }
 }
 
