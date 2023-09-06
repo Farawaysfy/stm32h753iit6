@@ -53,7 +53,7 @@ UART_HandleTypeDef huart3;
 static uint8_t machine_sta = 0;//machine status
 static uint8_t plane_sta=1,spray_sta=1;
 static uint8_t pul_sta=1,dir_sta=1,ena_sta=1;
-static uint32_t set_speed = 100;//set speed is 100 actually 70r/min motor output without reducer
+static uint32_t set_speed = 10;//设定吸附轮转速为set_speed，单位r/min，减速机减速比为10， 电机输出轴转速为set_speed * 10
 static uint32_t delay_period = 10000-1; //定时器延时周期数，一个周期0.1us
 
 static uint8_t Gate1_seed_num = 0, Gate2_seed_num = 0;//seed number of each gate
@@ -373,7 +373,7 @@ static void MX_TIM3_Init(void)
   htim3.Instance = TIM3;
   htim3.Init.Prescaler = 19;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 499;  
+  htim3.Init.Period = 299;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
@@ -698,10 +698,10 @@ uint32_t speed2Period(uint32_t speed)//speed 1r/min == 1/60000r/ms, 1ms = 1000 u
 {
     if(speed==0)
     {
-        return 1000000;
+        return 1000 - 1;
     }
     uint16_t step = 6400; //check figure, current status is sw5 off, sw6 on, sw7 off, sw8 on.
-    delay_period =(uint32_t)(10e7 * 60.0 / (step * speed) + 0.5);//0.1us为一个单位
+    delay_period =(uint32_t)(10e7 * 60.0 / (step * speed * 10.0) + 0.5);//0.1us为一个单位
     if(delay_period < 31) //最短周期为3us
         delay_period = 31;
     return delay_period - 1;
