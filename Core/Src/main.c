@@ -44,6 +44,7 @@ IWDG_HandleTypeDef hiwdg1;
 
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
 
 UART_HandleTypeDef huart1;
 UART_HandleTypeDef huart3;
@@ -53,7 +54,7 @@ static uint8_t machine_sta = 0;//machine status
 static uint8_t plane_sta=1,spray_sta=1;
 static uint8_t pul_sta=1,dir_sta=1,ena_sta=1;
 static uint32_t set_speed = 100;//set speed is 100 actually 70r/min motor output without reducer
-static uint32_t delay_time = 1000000;
+static uint32_t delay_period = 10000-1; //定时器延时周期数，一个周期0.1us
 
 static uint8_t Gate1_seed_num = 0, Gate2_seed_num = 0;//seed number of each gate
 static uint32_t receive_seed_num = 0b0;
@@ -77,6 +78,7 @@ static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_USART3_UART_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 void reload_tim1(uint32_t Period);//设置重装载的值，重新设置定时器时间
 
@@ -103,14 +105,14 @@ uint8_t Global_Status_set(uint8_t command);
 #define Light_Gate1 HAL_GPIO_ReadPin(GPIOA,GPIO_PIN_15) //Light_Gate1  PA15（光电门1信号）
 #define Light_Gate2 HAL_GPIO_ReadPin(GPIOB,GPIO_PIN_3) //Light_Gate2  PB3（光电门2信号）
 
-#define PUL_minus(n) (n ? HAL_GPIO_WritePin(GPIOB,GPIO_PIN_0,GPIO_PIN_SET): \
-                HAL_GPIO_WritePin(GPIOB,GPIO_PIN_0,GPIO_PIN_RESET)) // Pulse signal PB0（电机脉冲信号）
-#define overturn_PUL HAL_GPIO_TogglePin(GPIOB,GPIO_PIN_0) // 翻转电机脉冲信号
-//#define DIR_minus(n) (n ? HAL_GPIO_WritePin(GPIOF,GPIO_PIN_14,GPIO_PIN_SET): \
-//                HAL_GPIO_WritePin(GPIOF,GPIO_PIN_14,GPIO_PIN_RESET)) // Direction signal PF14, unuseful（正反转，弃用）
-#define ENA_minus(n) (n ? HAL_GPIO_WritePin(GPIOF,GPIO_PIN_13,GPIO_PIN_SET): \
-                HAL_GPIO_WritePin(GPIOF,GPIO_PIN_13,GPIO_PIN_RESET)) // Enable signal PF13（电机启停接口)
-#define overturn_ENA HAL_GPIO_TogglePin(GPIOF,GPIO_PIN_13) // 翻转电机启停接口
+#define PUL_minus(n) (n ? HAL_GPIO_WritePin(GPIOE,GPIO_PIN_5,GPIO_PIN_SET): \
+                HAL_GPIO_WritePin(GPIOE,GPIO_PIN_5,GPIO_PIN_RESET)) // Pulse signal PE5（电机脉冲信号）
+#define overturn_PUL HAL_GPIO_TogglePin(GPIOE,GPIO_PIN_5) // 翻转电机脉冲信号
+//#define DIR_minus(n) (n ? HAL_GPIO_WritePin(GPIOE,GPIO_PIN_6,GPIO_PIN_SET): \
+//                HAL_GPIO_WritePin(GPIOE,GPIO_PIN_6,GPIO_PIN_RESET)) // Direction signal PE6, unuseful（正反转，弃用）
+#define ENA_minus(n) (n ? HAL_GPIO_WritePin(GPIOB,GPIO_PIN_12,GPIO_PIN_SET): \
+                HAL_GPIO_WritePin(GPIOB,GPIO_PIN_12,GPIO_PIN_RESET)) // Enable signal PB12（电机启停接口)
+#define overturn_ENA HAL_GPIO_TogglePin(GPIOE,GPIO_PIN_12) // 翻转电机启停接口
 
 #define led1 HAL_GPIO_TogglePin(GPIOE,GPIO_PIN_5) // LED1 PE5  通信指示灯
 #define led2 HAL_GPIO_TogglePin(GPIOE,GPIO_PIN_6) // LED2 PE6 光电门1指示灯
@@ -150,6 +152,7 @@ int main(void)
   MX_TIM2_Init();
   MX_USART1_UART_Init();
   MX_USART3_UART_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 
     motor_init();
@@ -350,6 +353,52 @@ static void MX_TIM2_Init(void)
 }
 
 /**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 19;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 499;  
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+    HAL_TIM_Base_Start_IT(&htim3);  //开启定时器3中断
+  /* USER CODE END TIM3_Init 2 */
+
+}
+
+/**
   * @brief USART1 Initialization Function
   * @param None
   * @retval None
@@ -456,10 +505,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitTypeDef GPIO_InitStruct = {0};
 
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOE_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOG_CLK_ENABLE();
-  __HAL_RCC_GPIOE_CLK_ENABLE();
-  __HAL_RCC_GPIOA_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOE, GPIO_PIN_5|GPIO_PIN_6, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
@@ -470,8 +521,18 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOE, GPIO_PIN_13|GPIO_PIN_14, GPIO_PIN_SET);
 
-  /*Configure GPIO pin : PB0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : PE5 PE6 PE13 PE14 */
+  GPIO_InitStruct.Pin = GPIO_PIN_5|GPIO_PIN_6|GPIO_PIN_13|GPIO_PIN_14;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB0 PB12 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_12;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -484,30 +545,11 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : PE13 PE14 */
-  GPIO_InitStruct.Pin = GPIO_PIN_13|GPIO_PIN_14;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
-
   /*Configure GPIO pin : PG4 */
   GPIO_InitStruct.Pin = GPIO_PIN_4;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOG, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PA15 */
-  GPIO_InitStruct.Pin = GPIO_PIN_15;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pin : PB3 */
-  GPIO_InitStruct.Pin = GPIO_PIN_3;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_PULLDOWN;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
@@ -616,12 +658,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)//脉冲信号定时器中断
 {
-    if(htim==(&htim1) && ena_sta == 1)//送出脉冲信号
+    if(htim==(&htim3) && ena_sta == 1)//送出脉冲信号
     {
           overturn_PUL;
 //        PUL_minus(pul_sta);
 //        pul_sta = !pul_sta;
-//        reload_tim1(speed2Period(set_speed));//周期结束重设定时器
+        reload_tim1(speed2Period(set_speed));//周期结束重设定时器
     }
 }
 
@@ -659,10 +701,10 @@ uint32_t speed2Period(uint32_t speed)//speed 1r/min == 1/60000r/ms, 1ms = 1000 u
         return 1000000;
     }
     uint16_t step = 6400; //check figure, current status is sw5 off, sw6 on, sw7 off, sw8 on.
-    delay_time =(uint32_t)(500.0 * 60000.0/(step * speed) + 0.5);//1us为一个单位
-    if(delay_time<3)
-        delay_time = 3;
-    return delay_time - 1;
+    delay_period =(uint32_t)(10e7 * 60.0 / (step * speed) + 0.5);//0.1us为一个单位
+    if(delay_period < 31) //最短周期为3us
+        delay_period = 31;
+    return delay_period - 1;
 }//速度转为脉冲信号周期
 
 void motor_init()
